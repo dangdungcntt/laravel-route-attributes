@@ -47,7 +47,7 @@ class TestCase extends Orchestra
 
     public function assertRouteRegistered(
         string $controller,
-        string $controllerMethod = 'myMethod',
+        ?string $controllerMethod = 'myMethod',
         string $httpMethod = 'get',
         string $uri = 'my-method',
         string|array $middleware = [],

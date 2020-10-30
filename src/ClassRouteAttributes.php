@@ -6,21 +6,20 @@ use ReflectionClass;
 use Spatie\RouteAttributes\Attributes\Middleware;
 use Spatie\RouteAttributes\Attributes\Name;
 use Spatie\RouteAttributes\Attributes\Prefix;
+use Spatie\RouteAttributes\Attributes\Resource;
 use Spatie\RouteAttributes\Attributes\RouteAttribute;
 
 class ClassRouteAttributes
 {
-    private ReflectionClass $class;
-
-    public function __construct(ReflectionClass $class)
+    public function __construct(public ReflectionClass $class)
     {
-        $this->class = $class;
     }
+
 
     public function prefix(): ?string
     {
         /** @var \Spatie\RouteAttributes\Attributes\Prefix $attribute */
-        if (! $attribute = $this->getAttribute(Prefix::class)) {
+        if (!$attribute = $this->getAttribute(Prefix::class)) {
             return null;
         }
 
@@ -30,7 +29,7 @@ class ClassRouteAttributes
     public function middleware(): array
     {
         /** @var \Spatie\RouteAttributes\Attributes\Middleware $attribute */
-        if (! $attribute = $this->getAttribute(Middleware::class)) {
+        if (!$attribute = $this->getAttribute(Middleware::class)) {
             return [];
         }
 
@@ -40,7 +39,17 @@ class ClassRouteAttributes
     public function name(): ?string
     {
         /** @var \Spatie\RouteAttributes\Attributes\Name $attribute */
-        if (! $attribute = $this->getAttribute(Name::class)) {
+        if (!$attribute = $this->getAttribute(Name::class)) {
+            return null;
+        }
+
+        return $attribute->name;
+    }
+
+    public function resource(): ?string
+    {
+        /** @var \Spatie\RouteAttributes\Attributes\Resource $attribute */
+        if (!$attribute = $this->getAttribute(Resource::class)) {
             return null;
         }
 
@@ -51,7 +60,7 @@ class ClassRouteAttributes
     {
         $attributes = $this->class->getAttributes($attributeClass);
 
-        if (! count($attributes)) {
+        if (!count($attributes)) {
             return null;
         }
 

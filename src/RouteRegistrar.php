@@ -21,6 +21,16 @@ class RouteRegistrar
 
     private string $rootNamespace;
 
+    static array $resourceRouteByMethods = [
+        'index'   => ['get', '{name}', '{name}.index'],
+        'create'  => ['get', '{name}/create', '{name}.create'],
+        'store'   => ['post', '{name}', '{name}.store'],
+        'show'    => ['get', '{name}/{{route_key}}', '{name}.show'],
+        'edit'    => ['get', '{name}/{{route_key}}/edit', '{name}.edit'],
+        'update'  => ['put', '{name}/{{route_key}}', '{name}.update'],
+        'destroy' => ['delete', '{name}/{{route_key}}', '{name}.destroy'],
+    ];
+
     public function __construct(Router $router)
     {
         $this->router = $router;
@@ -89,46 +99,71 @@ class RouteRegistrar
         $class = new ReflectionClass($className);
 
         $classRouteAttributes = new ClassRouteAttributes($class);
-        $namePrefix = $classRouteAttributes->name();
+
+        $resourceName = $classRouteAttributes->resource();
 
         foreach ($class->getMethods() as $method) {
             $attributes = $method->getAttributes(RouteAttribute::class, ReflectionAttribute::IS_INSTANCEOF);
 
-            foreach ($attributes as $attribute) {
-                try {
-                    $attributeClass = $attribute->newInstance();
-                } catch (Throwable) {
-                    continue;
-                }
-
-                if ($attributeClass instanceof Route) {
-
-                    $httpMethod = $attributeClass->method;
-
-                    $action = $attributeClass->method === '__invoke'
-                        ? $class->getName()
-                        : [$class->getName(), $method->getName()];
-
-                    /** @var \Illuminate\Routing\Route $route */
-                    $route = $this->router->$httpMethod($attributeClass->uri, $action);
-
-                    if (is_null($namePrefix)) {
-                        $route->name($attributeClass->name);
-                    } else {
-                        $route
-                            ->name($namePrefix.$attributeClass->name);
+            $routeAttributes = collect($attributes)
+                ->map(function (ReflectionAttribute $attribute) {
+                    try {
+                        $attributeClass = $attribute->newInstance();
+                        return $attributeClass instanceof Route ? $attributeClass : false;
+                    } catch (Throwable) {
+                        return false;
                     }
+                })
+                ->reject(fn($attributeClass) => !$attributeClass);
 
-                    if ($prefix = $classRouteAttributes->prefix()) {
-                        $route->prefix($prefix);
-                    }
+            if ($routeAttributes->count()) {
+                $routeAttributes->each(fn(Route $methodRouteAttribute) => $this->registerRoute($classRouteAttributes,
+                    $methodRouteAttribute, $method->getName()));
+            } elseif ($resourceName && array_key_exists($method->getName(), static::$resourceRouteByMethods)) {
+                $params = collect(static::$resourceRouteByMethods[$method->getName()])
+                    ->map(fn($param) => $this->replaceResourceInfo($param, $resourceName));
 
-                    $classMiddleware = $classRouteAttributes->middleware();
-                    $methodMiddleware = $attributeClass->middleware;
-
-                    $route->middleware([...$classMiddleware, ...$methodMiddleware]);
-                }
+                $methodRouteAttribute = new Route(...$params);
+                $this->registerRoute($classRouteAttributes, $methodRouteAttribute, $method->getName());
             }
         }
+    }
+
+    protected function registerRoute(
+        ClassRouteAttributes $classRouteAttributes,
+        Route $methodRouteAttribute,
+        string $methodName
+    ) {
+        $httpMethod = $methodRouteAttribute->method;
+
+        $action = $methodName === '__invoke'
+            ? $classRouteAttributes->class->getName()
+            : [$classRouteAttributes->class->getName(), $methodName];
+
+        /** @var \Illuminate\Routing\Route $route */
+        $route = $this->router->$httpMethod($methodRouteAttribute->uri, $action);
+
+        if (is_null($namePrefix = $classRouteAttributes->name())) {
+            $route->name($methodRouteAttribute->name);
+        } else {
+            $route
+                ->name($namePrefix.$methodRouteAttribute->name);
+        }
+
+        if ($uriPrefix = $classRouteAttributes->prefix()) {
+            $route->prefix($uriPrefix);
+        }
+
+        $methodMiddleware = $methodRouteAttribute->middleware;
+
+        $route->middleware([...$classRouteAttributes->middleware(), ...$methodMiddleware]);
+    }
+
+    protected function replaceResourceInfo(string $param, string $resourceName): string
+    {
+        return strtr($param, [
+            '{name}'      => $resourceName,
+            '{route_key}' => Str::singular($resourceName)
+        ]);
     }
 }
