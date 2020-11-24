@@ -44,6 +44,5 @@ class MixResourceTestController
     #[Put('posts/{post}/update-status', name: 'posts.update-status', middleware: 'admin')]
     public function updateStatus()
     {
-
     }
 }

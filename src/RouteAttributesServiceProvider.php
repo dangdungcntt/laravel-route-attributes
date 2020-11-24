@@ -24,12 +24,12 @@ class RouteAttributesServiceProvider extends ServiceProvider
 
     protected function registerRoutes(): void
     {
-        if (!config('route-attributes.enabled') || $this->app->routesAreCached()) {
+        if (! config('route-attributes.enabled') || $this->app->routesAreCached()) {
             return;
         }
 
         $routeRegistrar = new RouteRegistrar(app()->router);
 
-        collect(config('directories'))->each(fn(string $directory) => $routeRegistrar->registerDirectory($directory));
+        collect(config('directories'))->each(fn (string $directory) => $routeRegistrar->registerDirectory($directory));
     }
 }
